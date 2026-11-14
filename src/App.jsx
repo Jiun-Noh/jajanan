@@ -101,10 +101,12 @@ function Aplikasi() {
         }
         if (db.adaDataLama()) {
           const ok = window.confirm(
-            `Ada data lama di HP ini (${lama.transaksi.length} transaksi, ${lama.pengeluaran.length} pengeluaran).\n\nPindahkan ke database sekarang?`,
+            `Ada data lama di HP ini:\n• ${lama.menu.length} menu\n• ${lama.transaksi.length} transaksi\n• ${lama.pengeluaran.length} pengeluaran\n\n` +
+              `Pindahkan ke database sekarang? Menu di database akan diganti dengan menu dari HP ini.`,
           )
           if (ok) {
             await db.pindahkanDataLama()
+            daftar = await db.ambilMenu()
             notify('✅ Data lama sudah dipindahkan')
             setVersi((v) => v + 1)
           }

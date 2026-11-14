@@ -131,14 +131,27 @@ export function dataLama() {
   }
 }
 
-export function adaDataLama() {
-  const d = dataLama()
-  return d.transaksi.length > 0 || d.pengeluaran.length > 0
+// Menu lama dianggap "berisi" kalau sudah diubah dari menu contoh bawaan prototipe
+function menuLamaDiubah(menu) {
+  const ringkas = (d) => JSON.stringify(d.map(({ id, nama, harga, emoji, kategori, tersedia }) => [id, nama, harga, emoji, kategori, tersedia]))
+  return menu.length > 0 && ringkas(menu) !== ringkas(MENU_CONTOH)
 }
 
-// Menu lama dipakai otomatis kalau database masih kosong (lihat App); ini untuk transaksi & pengeluaran.
+export function adaDataLama() {
+  const d = dataLama()
+  return d.transaksi.length > 0 || d.pengeluaran.length > 0 || menuLamaDiubah(d.menu)
+}
+
+// Pindahkan semua data prototipe dari HP ini ke database.
+// Menu di database DIGANTI dengan menu dari HP ini (transaksi lama tidak terpengaruh,
+// karena isi pesanan disimpan sebagai salinan nama & harga).
 export async function pindahkanDataLama() {
   const d = dataLama()
+  if (d.menu.length) {
+    await simpanBanyakMenu(d.menu.map((m, i) => ({ ...m, urutan: i })))
+    const ids = d.menu.map((m) => m.id).join(',')
+    periksa(await supabase.from('jajanan_menu').delete().not('id', 'in', `(${ids})`))
+  }
   if (d.transaksi.length) {
     periksa(await supabase.from('jajanan_transaksi').upsert(d.transaksi, { onConflict: 'id', ignoreDuplicates: true }))
   }
