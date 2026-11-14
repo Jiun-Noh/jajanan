@@ -109,6 +109,14 @@ function Aplikasi() {
             daftar = await db.ambilMenu()
             notify('✅ Data lama sudah dipindahkan')
             setVersi((v) => v + 1)
+          } else if (
+            window.confirm(
+              `Data lama TIDAK dipindahkan.\n\nHapus data lama dari HP ini supaya tidak ditanya lagi?\n\n` +
+                `⚠️ Data yang dihapus tidak bisa dikembalikan. Kalau ragu, tekan Batal (nanti ditanya lagi).`,
+            )
+          ) {
+            db.hapusDataLama()
+            notify('🗑️ Data lama di HP ini dihapus')
           }
         }
         setMenu(daftar)
@@ -173,7 +181,7 @@ function Aplikasi() {
 
   async function keluar() {
     if (antrean.length && !window.confirm(`Masih ada ${antrean.length} transaksi belum terkirim. Tetap keluar?`)) return
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' }) // HP ini saja, HP lain tetap masuk
   }
 
   return (
