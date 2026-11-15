@@ -3,6 +3,10 @@ import { formatRupiah, buatId } from '../lib/format'
 
 const PECAHAN = [5000, 10000, 20000, 50000, 100000]
 
+// stok null = tidak dihitung (tak terbatas)
+const bisaDijual = (m) => m.tersedia && m.stok !== 0
+const maksQty = (m) => (m.stok == null ? Infinity : m.stok)
+
 export default function Kasir({ menu, onSimpan }) {
   const [keranjang, setKeranjang] = useState({}) // { idMenu: qty }
   const [kategori, setKategori] = useState('Semua')
@@ -16,7 +20,7 @@ export default function Kasir({ menu, onSimpan }) {
       Object.entries(keranjang)
         .map(([id, qty]) => {
           const m = menu.find((x) => x.id === id)
-          return m ? { id, nama: m.nama, emoji: m.emoji, harga: m.harga, qty } : null
+          return m ? { id, nama: m.nama, emoji: m.emoji, harga: m.harga, qty, maks: maksQty(m) } : null
         })
         .filter(Boolean),
     [keranjang, menu],
@@ -25,8 +29,9 @@ export default function Kasir({ menu, onSimpan }) {
   const jumlahItem = item.reduce((s, i) => s + i.qty, 0)
 
   function ubahQty(id, delta) {
+    const m = menu.find((x) => x.id === id)
     setKeranjang((k) => {
-      const qty = (k[id] || 0) + delta
+      const qty = Math.min((k[id] || 0) + delta, m ? maksQty(m) : 0)
       const baru = { ...k }
       if (qty <= 0) delete baru[id]
       else baru[id] = qty
@@ -34,8 +39,8 @@ export default function Kasir({ menu, onSimpan }) {
     })
   }
 
-  function selesai(metode, diterima) {
-    onSimpan({
+  async function selesai(metode, diterima) {
+    const ok = await onSimpan({
       id: buatId(),
       waktu: new Date().toISOString(),
       items: item.map(({ id, nama, harga, qty }) => ({ id, nama, harga, qty })),
@@ -44,6 +49,7 @@ export default function Kasir({ menu, onSimpan }) {
       diterima,
       kembalian: metode === 'Tunai' ? diterima - total : 0,
     })
+    if (!ok) return // gagal: keranjang & layar bayar tetap, tinggal coba lagi
     setKeranjang({})
     setBayarBuka(false)
   }
@@ -58,20 +64,24 @@ export default function Kasir({ menu, onSimpan }) {
         ))}
       </div>
 
+      {menu.length === 0 && <p className="catatan">Belum ada menu. Tambahkan dulu di tab 📋 Menu.</p>}
+
       <div className="grid-menu">
         {menuTampil.map((m) => {
           const qty = keranjang[m.id] || 0
+          const dijual = bisaDijual(m)
           return (
             <button
               key={m.id}
               className={`kartu-menu ${qty ? 'dipilih' : ''}`}
-              disabled={!m.tersedia}
+              disabled={!dijual || qty >= maksQty(m)}
               onClick={() => ubahQty(m.id, 1)}
             >
               {qty > 0 && <span className="qty-badge">{qty}</span>}
               <span className="emoji">{m.emoji}</span>
               <span className="nama">{m.nama}</span>
-              <span className="harga">{m.tersedia ? formatRupiah(m.harga) : 'HABIS'}</span>
+              <span className="harga">{dijual ? formatRupiah(m.harga) : 'HABIS'}</span>
+              {dijual && m.stok != null && <span className={`sisa ${m.stok <= 3 ? 'menipis' : ''}`}>Sisa {m.stok - qty}</span>}
             </button>
           )
         })}
@@ -90,7 +100,7 @@ export default function Kasir({ menu, onSimpan }) {
               <span className="stepper">
                 <button onClick={() => ubahQty(i.id, -1)}>−</button>
                 <b>{i.qty}</b>
-                <button onClick={() => ubahQty(i.id, 1)}>+</button>
+                <button onClick={() => ubahQty(i.id, 1)} disabled={i.qty >= i.maks}>+</button>
               </span>
             </div>
           ))}
@@ -120,6 +130,7 @@ export default function Kasir({ menu, onSimpan }) {
 function ModalBayar({ total, onBatal, onSelesai }) {
   const [metode, setMetode] = useState('Tunai')
   const [diterima, setDiterima] = useState(total)
+  const [menyimpan, setMenyimpan] = useState(false)
 
   // Tombol cepat: uang pas + pecahan yang cukup buat bayar (maks. 4)
   const pilihanCepat = [total, ...PECAHAN.filter((p) => p > total)].slice(0, 4)
@@ -168,8 +179,16 @@ function ModalBayar({ total, onBatal, onSelesai }) {
           <p className="catatan">📱 Minta pelanggan scan QRIS, tunggu notifikasi masuk, lalu tekan Selesai.</p>
         )}
 
-        <button className="btn-utama lebar" disabled={kurang} onClick={() => onSelesai(metode, metode === 'Tunai' ? diterima : total)}>
-          ✅ Selesai
+        <button
+          className="btn-utama lebar"
+          disabled={kurang || menyimpan}
+          onClick={async () => {
+            setMenyimpan(true)
+            await onSelesai(metode, metode === 'Tunai' ? diterima : total)
+            setMenyimpan(false)
+          }}
+        >
+          {menyimpan ? 'Menyimpan…' : '✅ Selesai'}
         </button>
       </div>
     </div>

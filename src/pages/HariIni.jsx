@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatRupiah, tanggalLokal, jamMenit, buatId } from '../lib/format'
 import * as db from '../lib/penyimpanan'
 
-export default function HariIni({ antrean, versi, onHapusAntrean, notify }) {
+export default function HariIni({ notify }) {
   const [tanggal, setTanggal] = useState(tanggalLokal())
   const [formP, setFormP] = useState({ deskripsi: '', nominal: '' })
-  const [dariDb, setDariDb] = useState([])
+  const [trxHari, setTrxHari] = useState([])
   const [pglHari, setPglHari] = useState([])
   const [memuat, setMemuat] = useState(true)
   const [menyimpan, setMenyimpan] = useState(false)
@@ -16,7 +16,7 @@ export default function HariIni({ antrean, versi, onHapusAntrean, notify }) {
     Promise.all([db.ambilTransaksi(tanggal), db.ambilPengeluaran(tanggal)])
       .then(([t, p]) => {
         if (batal) return
-        setDariDb(t)
+        setTrxHari(t)
         setPglHari(p)
       })
       .catch((e) => !batal && notify(`⚠️ Gagal memuat: ${e.message}`))
@@ -24,16 +24,7 @@ export default function HariIni({ antrean, versi, onHapusAntrean, notify }) {
     return () => {
       batal = true
     }
-  }, [tanggal, versi, notify])
-
-  // Gabung dengan transaksi yang masih tertahan di HP (belum terkirim)
-  const trxHari = useMemo(() => {
-    const ada = new Set(dariDb.map((t) => t.id))
-    const tertunda = antrean
-      .filter((t) => tanggalLokal(t.waktu) === tanggal && !ada.has(t.id))
-      .map((t) => ({ ...t, tertunda: true }))
-    return [...tertunda, ...dariDb].sort((a, b) => (a.waktu < b.waktu ? 1 : -1))
-  }, [dariDb, antrean, tanggal])
+  }, [tanggal, notify])
 
   const omzet = trxHari.reduce((s, t) => s + t.total, 0)
   const tunai = trxHari.filter((t) => t.metode === 'Tunai').reduce((s, t) => s + t.total, 0)
@@ -84,11 +75,10 @@ export default function HariIni({ antrean, versi, onHapusAntrean, notify }) {
   }
 
   async function hapusTransaksi(t) {
-    if (!window.confirm('Batalkan transaksi ini?')) return
-    if (t.tertunda) return onHapusAntrean(t.id)
+    if (!window.confirm('Batalkan transaksi ini? Stoknya akan dikembalikan.')) return
     try {
       await db.hapusTransaksi(t.id)
-      setDariDb((d) => d.filter((x) => x.id !== t.id))
+      setTrxHari((d) => d.filter((x) => x.id !== t.id))
     } catch (err) {
       notify(`⚠️ Gagal membatalkan: ${err.message}`)
     }
@@ -180,7 +170,6 @@ export default function HariIni({ antrean, versi, onHapusAntrean, notify }) {
           <div key={t.id} className="baris-item">
             <span>
               <b>{jamMenit(t.waktu)}</b> · {t.metode === 'Tunai' ? '💵' : '📱'} {t.metode}
-              {t.tertunda && <small className="tertunda"> · ⏳ belum terkirim</small>}
               <br />
               <small>{t.items.map((i) => `${i.nama} ×${i.qty}`).join(', ')}</small>
             </span>

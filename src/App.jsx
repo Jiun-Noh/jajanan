@@ -6,6 +6,9 @@ import Masuk from './pages/Masuk'
 import Kasir from './pages/Kasir'
 import HariIni from './pages/HariIni'
 import Menu from './pages/Menu'
+import ModalPembaruan from './pages/Pembaruan'
+import { PEMBARUAN, pembaruanBelumDilihat, tandaiSudahDilihat } from './lib/pembaruan'
+import { useAdaVersiBaru } from './lib/versiBaru'
 
 const TAB = [
   { id: 'kasir', label: 'Kasir', ikon: '🛒' },
@@ -40,11 +43,10 @@ function Aplikasi() {
   const [tab, setTab] = useState('kasir')
   const [menu, setMenu] = useState([])
   const [memuat, setMemuat] = useState(true)
-  const [antrean, setAntrean] = useState(db.bacaAntrean)
-  const [versi, setVersi] = useState(0) // naik tiap ada transaksi terkirim → Penjualan muat ulang
   const [toast, setToast] = useState(null)
-  const sedangKirim = useRef(false)
-  const sudahMulai = useRef(false)
+  const [pembaruan, setPembaruan] = useState(pembaruanBelumDilihat) // popup otomatis
+  const [riwayatBuka, setRiwayatBuka] = useState(false)
+  const adaVersiBaru = useAdaVersiBaru()
   const timerToast = useRef(null)
 
   const notify = useCallback((pesan) => {
@@ -58,113 +60,54 @@ function Aplikasi() {
       setMenu(await db.ambilMenu())
     } catch (e) {
       notify(`⚠️ Gagal memuat menu: ${e.message}`)
-    }
-  }, [notify])
-
-  // Kirim transaksi yang tertahan di HP. Mengembalikan true kalau antrean kosong.
-  const kirimAntrean = useCallback(async () => {
-    if (sedangKirim.current) return false
-    sedangKirim.current = true
-    let adaTerkirim = false
-    try {
-      // baca ulang tiap putaran, supaya transaksi yang baru masuk ikut terkirim
-      for (let t = db.bacaAntrean()[0]; t; t = db.bacaAntrean()[0]) {
-        try {
-          await db.kirimTransaksi(t)
-        } catch {
-          break // masih offline — coba lagi nanti
-        }
-        db.tulisAntrean(db.bacaAntrean().filter((x) => x.id !== t.id))
-        adaTerkirim = true
-      }
     } finally {
-      sedangKirim.current = false
+      setMemuat(false)
     }
-    const sisa = db.bacaAntrean()
-    setAntrean(sisa)
-    if (adaTerkirim) setVersi((v) => v + 1)
-    return sisa.length === 0
-  }, [])
-
-  // Muat awal + pindahkan data prototipe (localStorage) kalau ada
-  useEffect(() => {
-    if (sudahMulai.current) return // StrictMode menjalankan effect dua kali di mode dev
-    sudahMulai.current = true
-    ;(async () => {
-      try {
-        const lama = db.dataLama()
-        let daftar = await db.ambilMenu()
-        if (daftar.length === 0) {
-          const awal = lama.menu.length ? lama.menu : db.MENU_CONTOH
-          await db.simpanBanyakMenu(awal.map((m, i) => ({ ...m, urutan: i })))
-          daftar = await db.ambilMenu()
-        }
-        if (db.adaDataLama()) {
-          const ok = window.confirm(
-            `Ada data lama di HP ini:\n• ${lama.menu.length} menu\n• ${lama.transaksi.length} transaksi\n• ${lama.pengeluaran.length} pengeluaran\n\n` +
-              `Pindahkan ke database sekarang? Menu di database akan diganti dengan menu dari HP ini.`,
-          )
-          if (ok) {
-            await db.pindahkanDataLama()
-            daftar = await db.ambilMenu()
-            notify('✅ Data lama sudah dipindahkan')
-            setVersi((v) => v + 1)
-          } else if (
-            window.confirm(
-              `Data lama TIDAK dipindahkan.\n\nHapus data lama dari HP ini supaya tidak ditanya lagi?\n\n` +
-                `⚠️ Data yang dihapus tidak bisa dikembalikan. Kalau ragu, tekan Batal (nanti ditanya lagi).`,
-            )
-          ) {
-            db.hapusDataLama()
-            notify('🗑️ Data lama di HP ini dihapus')
-          }
-        }
-        setMenu(daftar)
-      } catch (e) {
-        notify(`⚠️ Gagal memuat data: ${e.message}`)
-      } finally {
-        setMemuat(false)
-      }
-    })()
   }, [notify])
 
-  // Coba kirim ulang antrean: saat dibuka, saat sinyal kembali, dan tiap 30 detik
+  // Muat ulang menu tiap pindah tab → stok selalu terbaru (HP lain mungkin baru berjualan)
   useEffect(() => {
-    kirimAntrean()
-    const ulang = () => db.bacaAntrean().length && kirimAntrean()
-    window.addEventListener('online', ulang)
-    const id = setInterval(ulang, 30000)
-    return () => {
-      window.removeEventListener('online', ulang)
-      clearInterval(id)
-    }
-  }, [kirimAntrean])
+    muatMenu()
+  }, [tab, muatMenu])
 
+  // Kembalikan true kalau tersimpan, supaya Kasir tahu boleh mengosongkan keranjang
   async function simpanTransaksi(t) {
-    // Simpan dulu di HP supaya tidak hilang, baru dikirim
-    db.tulisAntrean([...db.bacaAntrean(), t])
-    setAntrean(db.bacaAntrean())
-    const terkirim = await kirimAntrean()
-    notify(terkirim ? `✅ Tersimpan — ${formatRupiah(t.total)}` : `⏳ Disimpan di HP — dikirim saat ada sinyal`)
+    try {
+      await db.simpanTransaksi(t)
+      notify(`✅ Tersimpan — ${formatRupiah(t.total)}`)
+      return true
+    } catch (e) {
+      notify(`⚠️ ${e.message}`)
+      return false
+    } finally {
+      muatMenu() // ambil stok terbaru, berhasil maupun gagal
+    }
   }
 
-  function hapusDariAntrean(id) {
-    db.tulisAntrean(db.bacaAntrean().filter((t) => t.id !== id))
-    setAntrean(db.bacaAntrean())
-  }
-
-  async function simpanMenu(item) {
+  async function simpanMenu(item, opsi) {
     const lama = menu
     const urutan = item.urutan ?? Math.max(-1, ...menu.map((m) => m.urutan ?? 0)) + 1
     const data = { ...item, urutan }
     setMenu((d) => (d.some((m) => m.id === data.id) ? d.map((m) => (m.id === data.id ? data : m)) : [...d, data]))
     try {
-      await db.simpanMenu(data)
+      const tersimpan = await db.simpanMenu(data, opsi)
+      setMenu((d) => d.map((m) => (m.id === tersimpan.id ? tersimpan : m))) // stok asli dari DB
       return true
     } catch (e) {
       setMenu(lama)
       notify(`⚠️ Gagal menyimpan: ${e.message}`)
       return false
+    }
+  }
+
+  async function tambahStok(id, jumlah) {
+    try {
+      const baru = await db.tambahStok(id, jumlah)
+      setMenu((d) => d.map((m) => (m.id === id ? { ...m, stok: baru } : m)))
+      return baru
+    } catch (e) {
+      notify(`⚠️ Gagal menambah stok: ${e.message}`)
+      return null
     }
   }
 
@@ -180,7 +123,7 @@ function Aplikasi() {
   }
 
   async function keluar() {
-    if (antrean.length && !window.confirm(`Masih ada ${antrean.length} transaksi belum terkirim. Tetap keluar?`)) return
+    if (!window.confirm('Keluar dari aplikasi?')) return
     await supabase.auth.signOut({ scope: 'local' }) // HP ini saja, HP lain tetap masuk
   }
 
@@ -188,12 +131,12 @@ function Aplikasi() {
     <div className="app">
       <header className="topbar">
         <span>🍟 Kasir Jajanan</span>
-        {antrean.length > 0 && (
-          <button className="badge-sinkron" onClick={kirimAntrean} title="Ketuk untuk kirim ulang">
-            ⏳ {antrean.length} belum terkirim
-          </button>
-        )}
       </header>
+      {adaVersiBaru && (
+        <button className="pita-versi" onClick={() => window.location.reload()}>
+          🔄 Versi baru tersedia — ketuk untuk memperbarui
+        </button>
+      )}
 
       <main className="konten">
         {memuat ? (
@@ -202,10 +145,10 @@ function Aplikasi() {
           <>
             {tab === 'kasir' && <Kasir menu={menu} onSimpan={simpanTransaksi} />}
             {tab === 'hariini' && (
-              <HariIni antrean={antrean} versi={versi} onHapusAntrean={hapusDariAntrean} notify={notify} />
+              <HariIni notify={notify} />
             )}
             {tab === 'menu' && (
-              <Menu menu={menu} onSimpan={simpanMenu} onHapus={hapusMenu} onMuatUlang={muatMenu} onKeluar={keluar} notify={notify} />
+              <Menu menu={menu} onSimpan={simpanMenu} onTambahStok={tambahStok} onHapus={hapusMenu} onKeluar={keluar} onRiwayat={() => setRiwayatBuka(true)} notify={notify} />
             )}
           </>
         )}
@@ -221,6 +164,17 @@ function Aplikasi() {
       </nav>
 
       {toast && <div className="toast">{toast}</div>}
+
+      {pembaruan.length > 0 && (
+        <ModalPembaruan
+          daftar={pembaruan}
+          onTutup={() => {
+            tandaiSudahDilihat()
+            setPembaruan([])
+          }}
+        />
+      )}
+      {riwayatBuka && <ModalPembaruan daftar={PEMBARUAN} judul="📢 Riwayat pembaruan" onTutup={() => setRiwayatBuka(false)} />}
     </div>
   )
 }
