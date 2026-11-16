@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { formatRupiah, tanggalLokal, jamMenit, buatId } from '../lib/format'
 import * as db from '../lib/penyimpanan'
 
-export default function HariIni({ notify }) {
-  const [tanggal, setTanggal] = useState(tanggalLokal())
+export default function HariIni({ tanggalAwal, notify }) {
+  const [tanggal, setTanggal] = useState(tanggalAwal || tanggalLokal())
   const [formP, setFormP] = useState({ deskripsi: '', nominal: '' })
   const [trxHari, setTrxHari] = useState([])
   const [pglHari, setPglHari] = useState([])
@@ -133,7 +133,9 @@ export default function HariIni({ notify }) {
       </div>
 
       <div className="kartu">
-        <strong>🧺 Belanja Bahan / Pengeluaran</strong>
+        <strong>
+          🧺 Belanja Bahan / Pengeluaran {pglHari.length > 0 && <small className="jumlah-judul">({pglHari.length})</small>}
+        </strong>
         <form onSubmit={tambahPengeluaran} className="form-baris">
           <input
             className="input"
@@ -152,20 +154,25 @@ export default function HariIni({ notify }) {
           />
           <button className="btn-utama kecil" type="submit" disabled={menyimpan}>+</button>
         </form>
-        {pglHari.map((p) => (
-          <div key={p.id} className="baris-item">
-            <span>{p.deskripsi}</span>
-            <span>
-              {formatRupiah(p.nominal)}{' '}
-              <button className="btn-teks merah" onClick={() => hapusPengeluaran(p.id)}>✕</button>
-            </span>
-          </div>
-        ))}
+        <div className="daftar-gulir">
+          {pglHari.map((p) => (
+            <div key={p.id} className="baris-item">
+              <span>{p.deskripsi}</span>
+              <span>
+                {formatRupiah(p.nominal)}{' '}
+                <button className="btn-teks merah" onClick={() => hapusPengeluaran(p.id)}>✕</button>
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="kartu">
-        <strong>🧾 Daftar Transaksi</strong>
+        <strong>
+          🧾 Daftar Transaksi {trxHari.length > 0 && <small className="jumlah-judul">({trxHari.length})</small>}
+        </strong>
         {trxHari.length === 0 && <p className="catatan">Belum ada transaksi.</p>}
+        <div className="daftar-gulir">
         {trxHari.map((t) => (
           <div key={t.id} className="baris-item">
             <span>
@@ -181,6 +188,7 @@ export default function HariIni({ notify }) {
             </span>
           </div>
         ))}
+        </div>
       </div>
     </div>
   )

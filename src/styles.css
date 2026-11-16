@@ -146,3 +146,40 @@ button { font: inherit; cursor: pointer; }
 .entri-pembaruan small { color: var(--abu); }
 .entri-pembaruan ul { margin: 6px 0 0; padding-left: 18px; }
 .entri-pembaruan li { margin-bottom: 8px; line-height: 1.4; font-size: 15px; }
+
+/* ---------- Daftar panjang: gulir di dalam kartu ---------- */
+.daftar-gulir {
+  max-height: 300px; overflow-y: auto;
+  overscroll-behavior: contain;           /* gulir mentok tidak ikut menggulir halaman */
+  -webkit-overflow-scrolling: touch;
+  /* bayangan halus di bawah = tanda masih ada isi di bawah */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  padding-bottom: 24px;                   /* = tinggi bayangan, supaya item terakhir tidak ikut pudar */
+}
+.jumlah-judul { color: var(--abu); font-weight: 500; }
+
+/* ---------- Laporan ---------- */
+.nav-bulan { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nav-bulan b { font-size: 17px; }
+.nav-bulan .chip { font-size: 20px; padding: 4px 16px; line-height: 1.2; }
+.nav-bulan .chip:disabled { opacity: .3; }
+.beda { font-size: 12px; font-weight: 600; color: var(--abu); }
+.beda.naik { color: #047857; }
+.beda.turun { color: var(--merah); }
+.catatan-banding { margin: 6px 2px 0; font-size: 12px; }
+
+/* grafik batang: satu warna (oranye), tumbuh dari satu garis dasar */
+.grafik { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 18px; border-bottom: 1px solid var(--garis); }
+.grafik-maks { position: absolute; top: 0; left: 0; font-size: 11px; color: var(--abu); }
+.grafik::before { content: ''; position: absolute; top: 18px; left: 0; right: 0; border-top: 1px dashed var(--garis); }
+.grafik-kolom { flex: 1; height: 100%; border: 0; padding: 0; background: transparent; display: flex; align-items: flex-end; justify-content: center; position: relative; z-index: 1; }
+.grafik-batang { display: block; width: 100%; max-width: 24px; min-height: 3px; background: var(--utama); border-radius: 4px 4px 0 0; }
+.grafik-kolom.dipilih .grafik-batang { background: #9a3412; }
+.grafik-kolom.dipilih { background: var(--utama-muda); border-radius: 4px 4px 0 0; }
+.grafik-sumbu { display: flex; gap: 2px; margin-top: 4px; }
+.grafik-sumbu span { flex: 1; text-align: center; font-size: 11px; color: var(--abu); }
+.detail-hari { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--utama-muda); border-radius: 12px; }
+.detail-hari small { color: var(--abu); }
+
+.batang-laris { height: 6px; border-radius: 999px; background: #fdba74; margin-bottom: 8px; }

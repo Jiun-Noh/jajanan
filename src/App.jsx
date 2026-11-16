@@ -5,6 +5,7 @@ import { formatRupiah } from './lib/format'
 import Masuk from './pages/Masuk'
 import Kasir from './pages/Kasir'
 import HariIni from './pages/HariIni'
+import Laporan from './pages/Laporan'
 import Menu from './pages/Menu'
 import ModalPembaruan from './pages/Pembaruan'
 import { PEMBARUAN, pembaruanBelumDilihat, tandaiSudahDilihat } from './lib/pembaruan'
@@ -13,6 +14,7 @@ import { useAdaVersiBaru } from './lib/versiBaru'
 const TAB = [
   { id: 'kasir', label: 'Kasir', ikon: '🛒' },
   { id: 'hariini', label: 'Penjualan', ikon: '📊' },
+  { id: 'laporan', label: 'Laporan', ikon: '📈' },
   { id: 'menu', label: 'Menu', ikon: '📋' },
 ]
 
@@ -41,6 +43,7 @@ export default function App() {
 
 function Aplikasi() {
   const [tab, setTab] = useState('kasir')
+  const [hariDipilih, setHariDipilih] = useState(null) // dari Laporan → buka Penjualan di tanggal itu
   const [menu, setMenu] = useState([])
   const [memuat, setMemuat] = useState(true)
   const [toast, setToast] = useState(null)
@@ -145,7 +148,17 @@ function Aplikasi() {
           <>
             {tab === 'kasir' && <Kasir menu={menu} onSimpan={simpanTransaksi} />}
             {tab === 'hariini' && (
-              <HariIni notify={notify} />
+              <HariIni tanggalAwal={hariDipilih} notify={notify} />
+            )}
+            {tab === 'laporan' && (
+              <Laporan
+                onBukaHari={(tgl) => {
+                  setHariDipilih(tgl)
+                  setTab('hariini')
+                  window.scrollTo(0, 0)
+                }}
+                notify={notify}
+              />
             )}
             {tab === 'menu' && (
               <Menu menu={menu} onSimpan={simpanMenu} onTambahStok={tambahStok} onHapus={hapusMenu} onKeluar={keluar} onRiwayat={() => setRiwayatBuka(true)} notify={notify} />
@@ -156,7 +169,10 @@ function Aplikasi() {
 
       <nav className="tabbar">
         {TAB.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'aktif' : ''} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={tab === t.id ? 'aktif' : ''} onClick={() => {
+              setHariDipilih(null)
+              setTab(t.id)
+            }}>
             <span className="ikon">{t.ikon}</span>
             {t.label}
           </button>

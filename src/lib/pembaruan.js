@@ -5,6 +5,17 @@
 
 export const PEMBARUAN = [
   {
+    versi: '1.2.0',
+    tanggal: '2026-11-17',
+    isi: [
+      '📈 Tab baru "Laporan": lihat omzet, untung bersih, transaksi, dan belanja bahan selama SEBULAN.',
+      '▲▼ Langsung terlihat naik/turun dibanding bulan lalu (untuk bulan berjalan, dibandingkan dengan tanggal yang sama bulan lalu).',
+      '📊 Grafik omzet per hari — ketuk batangnya untuk lihat angka hari itu, lalu tekan "Detail →" untuk membuka penjualan hari itu.',
+      '🔥 Menu terlaris sebulan, dan tombol ‹ › untuk melihat bulan-bulan sebelumnya.',
+      '📜 Daftar transaksi & belanja yang panjang sekarang bisa digulir di dalam kotaknya.',
+    ],
+  },
+  {
     versi: '1.1.0',
     tanggal: '2026-11-16',
     isi: [

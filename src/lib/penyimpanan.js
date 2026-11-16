@@ -82,3 +82,14 @@ export async function tambahPengeluaran(p) {
 export async function hapusPengeluaran(id) {
   periksa(await supabase.from('jajanan_pengeluaran').delete().eq('id', id))
 }
+
+// ---------------- Laporan bulanan ----------------
+// Dihitung di database (lihat 003_laporan.sql). bulan = 'YYYY-MM'.
+const ZONA_HP = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Makassar'
+
+export async function ambilLaporan(bulan) {
+  const [y, m] = bulan.split('-').map(Number)
+  const awal = `${bulan}-01`
+  const akhir = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`
+  return periksa(await supabase.rpc('jajanan_laporan', { awal, akhir, zona: ZONA_HP }))
+}
