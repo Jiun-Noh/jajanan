@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { formatRupiah, buatId } from '../lib/format'
 import { VERSI_TERBARU } from '../lib/pembaruan'
 
-const PILIHAN_EMOJI = ['🍟', '🥟', '🍡', '🌭', '🧈', '🍢', '🍌', '🍗', '🍜', '🍳', '🥪', '🌽', '🧋', '🍊', '☕', '💧', '🥤', '🍦']
+// Makanan dulu, lalu minuman. Usahakan tiap menu punya ikon yang BEDA supaya mudah dibedakan di Kasir.
+const PILIHAN_EMOJI = [
+  '🍟', '🍢', '🍡', '🌭', '🍗', '🍖', '🍤', '⭐', '❤️', '🥚', '🍳', '🍔', '🍞', '🥐', '🥪', '🥟',
+  '🧆', '🍜', '🍙', '🍘', '🌽', '🍠', '🧈', '🍌', '🧇', '🍩',
+  '🧋', '🍊', '☕', '💧', '🥤', '🍦',
+]
 const KATEGORI = ['Makanan', 'Minuman']
 const FORM_KOSONG = { nama: '', harga: '', emoji: '🍟', kategori: 'Makanan', stok: '' }
 const TAMBAH_CEPAT = [5, 10, 20, 50]
