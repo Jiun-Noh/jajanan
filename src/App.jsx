@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { supabase, konfigurasiAda } from './lib/supabase'
 import * as db from './lib/penyimpanan'
 import { formatRupiah } from './lib/format'
@@ -68,6 +68,12 @@ function Aplikasi() {
       setMemuat(false)
     }
   }, [notify])
+
+  // Pindah tab → mulai dari atas. Tanpa ini posisi gulir tab sebelumnya terbawa, dan tab yang
+  // lebih pendek terlihat kosong. useLayoutEffect = sebelum layar digambar, jadi tidak berkedip.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [tab])
 
   // Muat ulang menu tiap pindah tab → stok selalu terbaru (HP lain mungkin baru berjualan)
   useEffect(() => {
@@ -159,7 +165,6 @@ function Aplikasi() {
                 onBukaHari={(tgl) => {
                   setHariDipilih(tgl)
                   setTab('hariini')
-                  window.scrollTo(0, 0)
                 }}
                 notify={notify}
               />
@@ -174,6 +179,8 @@ function Aplikasi() {
       <nav className="tabbar">
         {TAB.map((t) => (
           <button key={t.id} className={tab === t.id ? 'aktif' : ''} onClick={() => {
+              // ketuk tab yang sedang dibuka → gulir halus ke atas
+              if (t.id === tab) return window.scrollTo({ top: 0, behavior: 'smooth' })
               setHariDipilih(null)
               setTab(t.id)
             }}>
