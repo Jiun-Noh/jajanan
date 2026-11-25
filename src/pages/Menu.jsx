@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { formatRupiah, buatId } from '../lib/format'
-import { VERSI_TERBARU } from '../lib/pembaruan'
 
 // Makanan dulu, lalu minuman. Usahakan tiap menu punya ikon yang BEDA supaya mudah dibedakan di Kasir.
 const PILIHAN_EMOJI = [
@@ -16,10 +15,14 @@ const TAMBAH_CEPAT = [5, 10, 20, 50]
 const keTeksStok = (stok) => (stok == null ? '' : String(stok))
 const dariTeksStok = (teks) => (teks.trim() === '' ? null : parseInt(teks, 10))
 
-export default function Menu({ menu, onSimpan, onTambahStok, onHapus, onKeluar, onRiwayat, notify }) {
+export default function Menu({ menu, onSimpan, onTambahStok, onHapus, onKeluar, notify }) {
   const [form, setForm] = useState(null) // null = tertutup; { ...data, id?, stokAwal }
   const [menyimpan, setMenyimpan] = useState(false)
   const [isiStok, setIsiStok] = useState(null) // menu yang sedang diisi ulang
+  const [cari, setCari] = useState('')
+
+  const q = cari.trim().toLowerCase()
+  const menuTampil = q ? menu.filter((m) => m.nama.toLowerCase().includes(q)) : menu
 
   async function simpan(e) {
     e.preventDefault()
@@ -56,10 +59,40 @@ export default function Menu({ menu, onSimpan, onTambahStok, onHapus, onKeluar, 
 
   return (
     <div>
-      <button className="btn-utama lebar" onClick={() => setForm(FORM_KOSONG)}>➕ Tambah Menu</button>
+      {/* menempel di bawah topbar seperti filter Kasir; daftar di bawahnya ikut gulir halaman (bukan kotak gulir) */}
+      <div className="bar-tetap bar-cari">
+        <div className="input-dengan-tombol cari-menu">
+          <input
+            className="input"
+            type="search"
+            placeholder="🔍 Cari menu…"
+            value={cari}
+            onChange={(e) => setCari(e.target.value)}
+          />
+          {cari && (
+            <button type="button" className="btn-kosongkan" onClick={() => setCari('')} aria-label="Hapus pencarian">
+              ✕
+            </button>
+          )}
+        </div>
+        <button className="btn-utama" onClick={() => setForm(FORM_KOSONG)}>➕ Tambah</button>
+      </div>
+      {q && (
+        <p className="catatan" style={{ margin: '0 2px' }}>
+          {menuTampil.length} dari {menu.length} menu
+        </p>
+      )}
 
       <div className="kartu">
-        {menu.map((m) => (
+        {q && menuTampil.length === 0 && (
+          <div className="kosong-cari">
+            <p className="catatan">Tidak ada menu "{cari.trim()}".</p>
+            <button className="btn-teks" onClick={() => setForm({ ...FORM_KOSONG, nama: cari.trim() })}>
+              ➕ Buat menu "{cari.trim()}"
+            </button>
+          </div>
+        )}
+        {menuTampil.map((m) => (
           <div key={m.id} className="baris-item">
             <span
               onClick={() => setForm({ ...m, harga: String(m.harga), stok: keTeksStok(m.stok), stokAwal: keTeksStok(m.stok) })}
@@ -93,8 +126,7 @@ export default function Menu({ menu, onSimpan, onTambahStok, onHapus, onKeluar, 
         abu-abu di Kasir. Menu yang stoknya dihitung otomatis berkurang saat terjual dan tidak bisa dijual kalau stok 0.
       </p>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-        <button className="btn-teks" onClick={onRiwayat}>📢 Riwayat pembaruan · v{VERSI_TERBARU}</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
         <button className="btn-teks merah" onClick={onKeluar}>🔒 Keluar</button>
       </div>
 

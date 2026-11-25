@@ -7,6 +7,8 @@
   --latar: #f6f3ef;
   --merah: #dc2626;
   --tinggi-tab: 64px;
+  --tinggi-atas: 48px;   /* topbar */
+  --tinggi-pita: 40px;   /* pita "Versi baru tersedia" */
 }
 
 * { box-sizing: border-box; }
@@ -26,7 +28,7 @@ button { font: inherit; cursor: pointer; }
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 16px; background: var(--utama); color: white; font-weight: 700; font-size: 17px;
+  height: var(--tinggi-atas); padding: 0 16px; background: var(--utama); color: white; font-weight: 700; font-size: 17px;
 }
 
 /* ruang bawah buat tab bar + bar bayar */
@@ -140,7 +142,7 @@ button { font: inherit; cursor: pointer; }
 .stepper button:disabled { opacity: .35; }
 
 /* ---------- Pembaruan ---------- */
-.pita-versi { position: sticky; top: 47px; z-index: 9; display: block; width: 100%; border: 0; padding: 10px 16px; background: #111827; color: white; font-size: 14px; font-weight: 600; }
+.pita-versi { position: sticky; top: var(--tinggi-atas); z-index: 9; display: block; width: 100%; height: var(--tinggi-pita); border: 0; padding: 0 16px; background: #111827; color: white; font-size: 14px; font-weight: 600; }
 .modal-pembaruan { max-height: 85vh; overflow-y: auto; }
 .entri-pembaruan { margin-top: 12px; }
 .entri-pembaruan small { color: var(--abu); }
@@ -170,16 +172,118 @@ button { font: inherit; cursor: pointer; }
 .catatan-banding { margin: 6px 2px 0; font-size: 12px; }
 
 /* grafik batang: satu warna (oranye), tumbuh dari satu garis dasar */
-.grafik { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 18px; border-bottom: 1px solid var(--garis); }
+.grafik { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 18px; border-bottom: 1px solid var(--garis);
+  touch-action: pan-y;   /* geser horizontal = pilih hari, geser vertikal = gulir halaman */
+  user-select: none; -webkit-user-select: none; cursor: pointer; }
 .grafik-maks { position: absolute; top: 0; left: 0; font-size: 11px; color: var(--abu); }
 .grafik::before { content: ''; position: absolute; top: 18px; left: 0; right: 0; border-top: 1px dashed var(--garis); }
-.grafik-kolom { flex: 1; height: 100%; border: 0; padding: 0; background: transparent; display: flex; align-items: flex-end; justify-content: center; position: relative; z-index: 1; }
+.grafik-kolom { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; position: relative; z-index: 1; pointer-events: none; }
+.grafik-kolom.nanti { opacity: .4; }
+.grafik-label { position: absolute; top: 0; transform: translateX(-50%); z-index: 2; font-size: 11px; font-weight: 700; color: white; background: #9a3412; border-radius: 6px; padding: 1px 6px; pointer-events: none; }
 .grafik-batang { display: block; width: 100%; max-width: 24px; min-height: 3px; background: var(--utama); border-radius: 4px 4px 0 0; }
 .grafik-kolom.dipilih .grafik-batang { background: #9a3412; }
 .grafik-kolom.dipilih { background: var(--utama-muda); border-radius: 4px 4px 0 0; }
 .grafik-sumbu { display: flex; gap: 2px; margin-top: 4px; }
 .grafik-sumbu span { flex: 1; text-align: center; font-size: 11px; color: var(--abu); }
-.detail-hari { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--utama-muda); border-radius: 12px; }
+.detail-hari { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 8px; background: var(--utama-muda); border-radius: 12px; }
+.isi-detail-hari { flex: 1; text-align: center; }
+.btn-geser-hari { flex-shrink: 0; width: 44px; height: 56px; border: 1px solid #fed7aa; border-radius: 10px; background: white; font-size: 24px; color: var(--utama); }
+.btn-geser-hari:disabled { opacity: .3; }
 .detail-hari small { color: var(--abu); }
 
 .batang-laris { height: 6px; border-radius: 999px; background: #fdba74; margin-bottom: 8px; }
+
+/* ---------- Belanja ---------- */
+.label-kecil { display: block; font-size: 12px; color: var(--abu); margin: 10px 0 6px; }
+.form-belanja .input { margin-bottom: 8px; }
+.form-belanja .form-baris .input { margin-bottom: 0; }
+.chip-gulir { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.chip-gulir::-webkit-scrollbar { display: none; }
+.chip-saran { white-space: nowrap; flex-shrink: 0; font-size: 13px; padding: 6px 12px; background: var(--utama-muda); border-color: #fed7aa; }
+.chip-kategori .chip { font-size: 13px; padding: 6px 10px; }
+.draf-belanja { margin-top: 12px; padding: 4px 12px 12px; border: 2px dashed #fdba74; border-radius: 12px; background: #fffbf5; }
+.draf-belanja .btn-utama.lebar { margin-top: 10px; }
+
+/* ---------- Balik modal ---------- */
+.meter-balik { height: 12px; border-radius: 999px; background: var(--garis); overflow: hidden; }
+.meter-balik span { display: block; height: 100%; background: #10b981; border-radius: 999px; }
+.baris-balik { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 8px 0 4px; }
+.baris-balik small { color: var(--abu); text-align: right; }
+
+.input-dengan-tombol { position: relative; }
+.input-dengan-tombol.ada-tombol .input { padding-right: 110px; } /* ruang tombol Kosongkan — hanya saat tombolnya tampil */
+.btn-kosongkan { position: absolute; right: 6px; top: 6px; border: 0; border-radius: 8px; background: #f3f4f6; color: var(--abu); font-size: 13px; padding: 6px 10px; }
+.judul-draf { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.judul-draf .label-kecil { margin: 10px 0 6px; }
+.judul-draf .btn-teks { font-size: 13px; white-space: nowrap; }
+/* area saran: tinggi tetap = satu baris chip */
+.area-saran { min-height: 40px; align-items: center; }
+.saran-kosong { font-size: 13px; color: var(--abu); white-space: nowrap; }
+.btn-lihat-semua { width: 100%; margin-top: 4px; padding: 8px 0; font-size: 14px; }
+
+/* Filter kategori di Kasir: menempel di bawah topbar (dan di bawah pita versi baru kalau tampil) */
+.app { --atas-filter: var(--tinggi-atas); }
+.app.ada-pita { --atas-filter: calc(var(--tinggi-atas) + var(--tinggi-pita)); }
+.filter-kasir, .bar-tetap {
+  position: sticky; top: var(--atas-filter); z-index: 8;
+  margin: -14px -16px 10px; padding: 10px 16px 8px;   /* selebar layar, menutupi menu yang lewat di bawahnya */
+  background: var(--latar); box-shadow: 0 4px 6px -6px rgba(0,0,0,.25);
+  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+}
+.filter-kasir::-webkit-scrollbar { display: none; }
+.filter-kasir .chip { flex-shrink: 0; }
+
+/* ---------- Kasir: kartu dengan tombol kurang, lembar pesanan ---------- */
+.sel-menu { position: relative; display: flex; }
+.sel-menu .kartu-menu { flex: 1; width: 100%; }
+.btn-kurang {
+  position: absolute; top: 4px; left: 4px; z-index: 2;
+  width: 32px; height: 32px; border-radius: 999px; border: 0;
+  background: white; color: var(--utama); font-size: 22px; font-weight: 700; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+.btn-kurang:active { transform: scale(.9); }
+.btn-lihat-pesanan { flex: 1; text-align: left; border: 0; background: transparent; padding: 0; color: inherit; font: inherit; }
+.btn-lihat-pesanan small { color: var(--abu); }
+.isi-pesanan { max-height: 50vh; overflow-y: auto; overscroll-behavior: contain; margin: 6px 0; }
+.kaki-pesanan { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--garis); }
+.kaki-pesanan .total { font-size: 22px; font-weight: 800; }
+.ringkasan-bayar { text-align: center; color: var(--abu); font-size: 13px; margin: 8px 0 0; line-height: 1.4; }
+
+/* ---------- Rincian balik modal ---------- */
+.kartu-ketuk { cursor: pointer; position: relative; }
+.kartu-ketuk:active { background: #fafafa; }
+.tautan-rincian { position: absolute; top: 14px; right: 14px; color: var(--utama); font-size: 13px; font-weight: 600; }
+.sub-judul { display: block; margin-top: 16px; }
+.teks-merah { color: var(--merah); }
+.kotak-perkiraan { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #ecfdf5; font-size: 14px; line-height: 1.45; }
+.kotak-perkiraan small { color: var(--abu); }
+.daftar-alat { max-height: 260px; }
+.baris-total-alat { border-top: 2px solid var(--garis); }
+
+/* Judul popup menempel di atas saat isi popup digulir → tombol ✕ selalu terjangkau.
+   top/margin negatif = menutupi padding atas .modal (16px) supaya tidak ada celah. */
+.modal > .modal-judul {
+  position: sticky; top: -16px; z-index: 3;
+  margin: -16px -16px 8px; padding: 16px 16px 10px;
+  background: white; border-radius: 18px 18px 0 0;
+  border-bottom: 1px solid var(--garis);
+}
+.modal > .modal-judul .btn-teks { font-size: 20px; padding: 4px 8px; } /* ✕ sedikit lebih besar */
+
+/* tombol Tambah Menu yang menempel: tanpa scroll horizontal, tombol tanpa margin ekstra */
+.bar-tetap { overflow: visible; padding: 10px 16px; }
+.bar-tetap .btn-utama.lebar { margin-top: 0; }
+
+/* Menu: baris cari + tombol tambah dalam satu bar yang menempel */
+.bar-cari { display: flex; gap: 8px; align-items: center; }
+.bar-cari .cari-menu { flex: 1; min-width: 0; }
+.bar-cari .btn-utama { flex-shrink: 0; padding: 12px 16px; white-space: nowrap; }
+.cari-menu.input-dengan-tombol .input { padding-right: 44px; }
+.cari-menu .btn-kosongkan { padding: 6px 10px; }
+.cari-menu .input::-webkit-search-cancel-button { display: none; } /* pakai tombol ✕ sendiri */
+.kosong-cari { text-align: center; padding: 6px 0; }
+
+/* tombol ikon di topbar (📢 riwayat pembaruan) */
+.btn-atas { border: 0; background: rgba(255,255,255,.18); color: white; width: 36px; height: 36px; border-radius: 10px; font-size: 18px; line-height: 1; display: grid; place-items: center; }
+.btn-atas:active { background: rgba(255,255,255,.32); }

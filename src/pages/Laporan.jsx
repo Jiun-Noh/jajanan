@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatRupiah, tanggalLokal } from '../lib/format'
 import * as db from '../lib/penyimpanan'
+import { KATEGORI_BELANJA, infoKategori } from '../lib/kategori'
+import PeringkatMenu from './PeringkatMenu'
 
 // 'YYYY-MM' bulan ini / geser n bulan
 const bulanIni = () => tanggalLokal().slice(0, 7)
@@ -32,8 +34,10 @@ function ringkas(data, batasHari = 31) {
   const pgl = (data?.pengeluaran || []).filter((p) => hariKe(p.tanggal) <= batasHari)
   const omzet = harian.reduce((s, h) => s + h.omzet, 0)
   const tunai = harian.reduce((s, h) => s + h.tunai, 0)
-  const pengeluaran = pgl.reduce((s, p) => s + p.nominal, 0)
+  const pengeluaran = pgl.reduce((s, p) => s + p.nominal, 0) // operasional (tanpa peralatan)
+  const modal = pgl.reduce((s, p) => s + (p.modal || 0), 0)
   return {
+    modal,
     omzet,
     tunai,
     qris: omzet - tunai,
@@ -116,9 +120,54 @@ export default function Laporan({ onBukaHari, notify }) {
 
   const maks = Math.max(0, ...perHari.map((h) => h.omzet))
   const terbaik = maks > 0 ? perHari.find((h) => h.omzet === maks) : null
-  const hDipilih = perHari.find((h) => h.tgl === dipilih)
+  const iDipilih = perHari.findIndex((h) => h.tgl === dipilih)
+  const hDipilih = perHari[iDipilih]
+  // hari terakhir yang boleh dipilih (bulan berjalan: sampai hari ini)
+  const iTerakhir = perHari.reduce((akhir, h, i) => (h.nanti ? akhir : i), -1)
+
+  // Geser jari di atas grafik → hari di bawah jari langsung terpilih (tidak perlu kena batang yang kecil)
+  const grafikRef = useRef(null)
+  const sedangGeser = useRef(false)
+  function pilihDariX(clientX) {
+    const el = grafikRef.current
+    if (!el || iTerakhir < 0) return
+    const { left, width } = el.getBoundingClientRect()
+    const i = Math.floor(((clientX - left) / width) * perHari.length)
+    setDipilih(perHari[Math.max(0, Math.min(iTerakhir, i))].tgl)
+  }
+  const geser = {
+    onPointerDown: (e) => {
+      sedangGeser.current = true
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      pilihDariX(e.clientX)
+    },
+    onPointerMove: (e) => sedangGeser.current && pilihDariX(e.clientX),
+    onPointerUp: () => (sedangGeser.current = false),
+    onPointerCancel: () => (sedangGeser.current = false), // jari bergerak vertikal → halaman yang digulir
+  }
+  const pindahHari = (arah) => {
+    const i = iDipilih + arah
+    if (i >= 0 && i <= iTerakhir) setDipilih(perHari[i].tgl)
+  }
   const menu = data?.menu || []
-  const menuMaks = menu[0]?.qty || 1
+
+  // Biaya per kategori (operasional saja) & rasio biaya bahan terhadap omzet
+  const perKategori = KATEGORI_BELANJA.filter((k) => !k.modal)
+    .map((k) => ({ ...k, nominal: (data?.kategori || []).find((x) => x.kategori === k.id)?.nominal || 0 }))
+    .filter((k) => k.nominal > 0)
+  const kategoriMaks = Math.max(1, ...perKategori.map((k) => k.nominal))
+  const biayaBahan = perKategori.filter((k) => ['Bahan', 'Bumbu', 'Kemasan'].includes(k.id)).reduce((s, k) => s + k.nominal, 0)
+
+  // Balik modal: untung (tanpa modal) sejak awal ÷ total modal peralatan
+  const sp = data?.sepanjang || { omzet: 0, operasional: 0, modal: 0 }
+  const untungSepanjang = sp.omzet - sp.operasional
+  const persenBalik = sp.modal > 0 ? Math.max(0, Math.min(100, Math.round((untungSepanjang / sp.modal) * 100))) : 0
+
+  const barang = data?.barang || []
+  const [barangDipilih, setBarangDipilih] = useState(null)
+  const [rincianModalBuka, setRincianModalBuka] = useState(false)
+  // rata-rata untung per hari berjualan bulan ini → dasar perkiraan balik modal
+  const untungPerHari = r.hariJualan > 0 ? r.laba / r.hariJualan : null
 
   return (
     <div>
@@ -153,7 +202,7 @@ export default function Laporan({ onBukaHari, notify }) {
           <Beda persen={persenBeda(r.transaksi, rLalu.transaksi)} />
         </div>
         <div className="kotak merah-muda">
-          <small>Belanja Bahan</small>
+          <small>Biaya Operasional</small>
           <b>{formatRupiah(r.pengeluaran)}</b>
         </div>
         <div className="kotak">
@@ -166,6 +215,42 @@ export default function Laporan({ onBukaHari, notify }) {
         </div>
       </div>
       {rLalu.omzet > 0 && <p className="catatan catatan-banding">▲▼ = {labelBanding}</p>}
+      <p className="catatan catatan-banding">Untung Bersih = Omzet − Biaya Operasional (peralatan/modal tidak dihitung).</p>
+
+      {sp.modal > 0 && (
+        <div className="kartu kartu-ketuk" onClick={() => setRincianModalBuka(true)} role="button">
+          <strong>🛠️ Balik Modal</strong>
+          <small className="tautan-rincian">Ketuk untuk rincian →</small>
+          <p className="catatan" style={{ margin: '4px 0 10px' }}>
+            Untung yang sudah terkumpul dibanding uang yang dipakai beli peralatan{sedangBerjalan ? ' (sampai hari ini)' : ` (sampai akhir ${namaBulan(bulan, { month: 'long' })})`}.
+          </p>
+          <div className="meter-balik" role="img" aria-label={`Balik modal ${persenBalik} persen`}>
+            <span style={{ width: `${persenBalik}%` }} />
+          </div>
+          <div className="baris-balik">
+            <b>{persenBalik}% kembali</b>
+            <small>
+              {untungSepanjang >= sp.modal
+                ? `✅ Sudah balik modal! Lebih ${formatRupiah(untungSepanjang - sp.modal)}`
+                : `Sisa ${formatRupiah(sp.modal - Math.max(0, untungSepanjang))}`}
+            </small>
+          </div>
+          <div className="baris-item">
+            <span><small>Modal peralatan</small></span>
+            <b>{formatRupiah(sp.modal)}</b>
+          </div>
+          <div className="baris-item">
+            <span><small>Untung terkumpul</small></span>
+            <b>{formatRupiah(untungSepanjang)}</b>
+          </div>
+          {r.modal > 0 && (
+            <div className="baris-item">
+              <span><small>Beli peralatan bulan ini</small></span>
+              <b>{formatRupiah(r.modal)}</b>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="kartu">
         <strong>📈 Omzet per Hari</strong>
@@ -177,18 +262,27 @@ export default function Laporan({ onBukaHari, notify }) {
 
         {maks > 0 && (
           <>
-            <div className="grafik" role="img" aria-label={`Grafik omzet harian ${namaBulan(bulan)}`}>
+            <div
+              ref={grafikRef}
+              className="grafik"
+              role="img"
+              aria-label={`Grafik omzet harian ${namaBulan(bulan)}`}
+              {...geser}
+            >
               <span className="grafik-maks">{rupiahRingkas(maks)}</span>
+              {hDipilih && (
+                <span className="grafik-label" style={{ left: `${((iDipilih + 0.5) / perHari.length) * 100}%` }}>
+                  {iDipilih + 1}
+                </span>
+              )}
               {perHari.map((h) => (
-                <button
+                <span
                   key={h.tgl}
                   className={`grafik-kolom ${dipilih === h.tgl ? 'dipilih' : ''} ${h.nanti ? 'nanti' : ''}`}
-                  onClick={() => setDipilih((d) => (d === h.tgl ? null : h.tgl))}
-                  disabled={h.nanti}
                   title={`${namaHari(h.tgl)}: ${formatRupiah(h.omzet)}`}
                 >
                   {h.omzet > 0 && <span className="grafik-batang" style={{ height: `${(h.omzet / maks) * 100}%` }} />}
-                </button>
+                </span>
               ))}
             </div>
             <div className="grafik-sumbu">
@@ -199,20 +293,23 @@ export default function Laporan({ onBukaHari, notify }) {
 
             {hDipilih ? (
               <div className="detail-hari">
-                <div>
+                <button className="btn-geser-hari" onClick={() => pindahHari(-1)} disabled={iDipilih <= 0} aria-label="Hari sebelumnya">‹</button>
+                <div className="isi-detail-hari">
                   <b>{namaHari(hDipilih.tgl)}</b>
                   <br />
                   <small>
-                    {formatRupiah(hDipilih.omzet)} · {hDipilih.transaksi} transaksi
+                    {hDipilih.omzet > 0 ? `${formatRupiah(hDipilih.omzet)} · ${hDipilih.transaksi} transaksi` : 'Tidak ada penjualan'}
                     {hDipilih.pengeluaran > 0 && ` · belanja ${formatRupiah(hDipilih.pengeluaran)}`}
                   </small>
+                  <br />
+                  <button className="btn-teks" onClick={() => onBukaHari(hDipilih.tgl)} style={{ padding: '4px 0 0' }}>Lihat detail hari ini →</button>
                 </div>
-                <button className="btn-utama kecil" onClick={() => onBukaHari(hDipilih.tgl)}>Detail →</button>
+                <button className="btn-geser-hari" onClick={() => pindahHari(1)} disabled={iDipilih >= iTerakhir} aria-label="Hari berikutnya">›</button>
               </div>
             ) : (
               <p className="catatan" style={{ marginBottom: 0 }}>
                 {terbaik && `🏆 Terbaik: ${namaHari(terbaik.tgl)} (${formatRupiah(terbaik.omzet)}). `}
-                Ketuk batang untuk melihat harinya.
+                👆 Sentuh atau geser jari di grafik untuk melihat tiap hari.
               </p>
             )}
 
@@ -242,19 +339,215 @@ export default function Laporan({ onBukaHari, notify }) {
       </div>
 
       <div className="kartu">
-        <strong>🔥 Menu Terlaris Bulan Ini</strong>
-        {menu.length === 0 && <p className="catatan">Belum ada penjualan.</p>}
+        <strong>🧺 Biaya Operasional per Kategori</strong>
+        {perKategori.length === 0 && <p className="catatan">Belum ada belanja bulan ini.</p>}
+        {perKategori.map((k) => (
+          <div key={k.id} className="baris-menu-laris">
+            <div className="baris-item" style={{ borderBottom: 0, paddingBottom: 2 }}>
+              <span>{k.ikon} {k.label}</span>
+              <span>
+                <b>{formatRupiah(k.nominal)}</b> <small>{Math.round((k.nominal / Math.max(1, r.pengeluaran)) * 100)}%</small>
+              </span>
+            </div>
+            <div className="batang-laris" style={{ width: `${(k.nominal / kategoriMaks) * 100}%` }} />
+          </div>
+        ))}
+        {r.omzet > 0 && biayaBahan > 0 && (
+          <p className="catatan" style={{ marginBottom: 0 }}>
+            🥩 Biaya bahan + bumbu + kemasan = <b>{Math.round((biayaBahan / r.omzet) * 100)}%</b> dari omzet
+            {' '}(dari Rp 10.000 penjualan, ±{formatRupiah((biayaBahan / r.omzet) * 10000)} untuk bahan).
+          </p>
+        )}
+      </div>
+
+      <div className="kartu">
+        <strong>🛒 Barang Paling Banyak Dibeli</strong>
+        {barang.length === 0 && <p className="catatan">Belum ada belanja bulan ini.</p>}
+        {barang.length > 0 && <small className="label-kecil">Urut dari total uang terbesar · ketuk untuk lihat riwayat harga</small>}
         <div className="daftar-gulir">
-          {menu.map((m, i) => (
-            <div key={m.nama} className="baris-menu-laris">
-              <div className="baris-item" style={{ borderBottom: 0, paddingBottom: 2 }}>
-                <span>{i + 1}. {m.nama}</span>
-                <span><b>{m.qty}×</b> <small>{formatRupiah(m.nominal)}</small></span>
-              </div>
-              <div className="batang-laris" style={{ width: `${(m.qty / menuMaks) * 100}%` }} />
+          {barang.map((b) => (
+            <div key={b.nama} className="baris-item" onClick={() => setBarangDipilih(b)} style={{ cursor: 'pointer' }}>
+              <span>
+                {infoKategori(b.kategori).ikon} {b.nama}
+                <br />
+                <small>
+                  {b.kali}× beli{b.kali > 1 && ` · rata-rata ${formatRupiah(b.rata)}`}
+                  {b.termurah !== b.termahal && ` · ${formatRupiah(b.termurah)}–${formatRupiah(b.termahal)}`}
+                </small>
+              </span>
+              <b>{formatRupiah(b.total)}</b>
             </div>
           ))}
         </div>
+      </div>
+
+      {rincianModalBuka && (
+        <ModalBalikModal
+          sp={sp}
+          akhir={`${geserBulan(bulan, 1)}-01`}
+          persen={persenBalik}
+          untungPerHari={sedangBerjalan ? untungPerHari : null}
+          hariJualan={r.hariJualan}
+          labelSampai={sedangBerjalan ? 'sampai hari ini' : `sampai akhir ${namaBulan(bulan, { month: 'long' })}`}
+          onTutup={() => setRincianModalBuka(false)}
+          notify={notify}
+        />
+      )}
+
+      {barangDipilih && <ModalRiwayat barang={barangDipilih} onTutup={() => setBarangDipilih(null)} notify={notify} />}
+
+      <div className="kartu">
+        <strong>🔥 Menu Terlaris Bulan Ini</strong>
+        <PeringkatMenu key={bulan} daftar={menu} batang />
+      </div>
+    </div>
+  )
+}
+
+// Riwayat harga satu barang (semua bulan), terbaru di atas, dengan naik/turun dari pembelian sebelumnya
+function ModalRiwayat({ barang, onTutup, notify }) {
+  const [riwayat, setRiwayat] = useState(null)
+
+  useEffect(() => {
+    db.ambilRiwayatBarang(barang.nama)
+      .then(setRiwayat)
+      .catch((e) => {
+        notify(`⚠️ Gagal memuat riwayat: ${e.message}`)
+        onTutup()
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barang.nama]) // muat sekali per barang (onTutup/notify tidak perlu memicu muat ulang)
+
+  return (
+    <div className="overlay" onClick={onTutup}>
+      <div className="modal modal-pembaruan" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-judul">
+          <span>
+            {infoKategori(barang.kategori).ikon} {barang.nama}
+          </span>
+          <button className="btn-teks" onClick={onTutup}>✕</button>
+        </div>
+        {!riwayat && <p className="catatan">Memuat…</p>}
+        {riwayat && (
+          <>
+            <p className="catatan" style={{ marginTop: 0 }}>
+              Dibeli {riwayat.length}× · total {formatRupiah(riwayat.reduce((s, x) => s + x.nominal, 0))}
+            </p>
+            {riwayat.map((x, i) => {
+              const sebelum = riwayat[i + 1]?.nominal
+              const beda = sebelum ? x.nominal - sebelum : 0
+              return (
+                <div key={x.id} className="baris-item">
+                  <span>{namaHari(x.tanggal)}</span>
+                  <span>
+                    <b>{formatRupiah(x.nominal)}</b>{' '}
+                    {beda !== 0 && (
+                      <small className={`beda ${beda > 0 ? 'turun' : 'naik'}`}>
+                        {beda > 0 ? '▲' : '▼'} {formatRupiah(Math.abs(beda))}
+                      </small>
+                    )}
+                  </span>
+                </div>
+              )
+            })}
+            <p className="catatan">▲ merah = lebih mahal dari pembelian sebelumnya, ▼ hijau = lebih murah.</p>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Rincian "Balik Modal": daftar peralatan, hitungan untung, dan perkiraan kapan modal kembali
+function ModalBalikModal({ sp, akhir, persen, untungPerHari, hariJualan, labelSampai, onTutup, notify }) {
+  const [alat, setAlat] = useState(null)
+
+  useEffect(() => {
+    db.ambilPeralatan(akhir)
+      .then(setAlat)
+      .catch((e) => {
+        notify(`⚠️ Gagal memuat rincian: ${e.message}`)
+        onTutup()
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [akhir])
+
+  const untung = sp.omzet - sp.operasional
+  const sisa = sp.modal - untung
+  const sudah = sisa <= 0
+
+  let perkiraan = null
+  if (!sudah && untungPerHari !== null) {
+    perkiraan =
+      untungPerHari > 0
+        ? `Dengan rata-rata untung ${formatRupiah(untungPerHari)} per hari jualan bulan ini, modal diperkirakan kembali dalam ±${Math.ceil(sisa / untungPerHari)} hari jualan lagi.`
+        : 'Belum bisa diperkirakan — untung harian bulan ini masih minus. Biasanya membaik setelah stok awal habis terpakai.'
+  }
+
+  return (
+    <div className="overlay" onClick={onTutup}>
+      <div className="modal modal-pembaruan" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-judul">
+          <span>🛠️ Rincian Balik Modal</span>
+          <button className="btn-teks" onClick={onTutup}>✕</button>
+        </div>
+        <p className="catatan" style={{ marginTop: 4 }}>Dihitung sejak awal berjualan, {labelSampai}.</p>
+
+        <div className="meter-balik" role="img" aria-label={`Balik modal ${persen} persen`}>
+          <span style={{ width: `${persen}%` }} />
+        </div>
+        <div className="baris-balik">
+          <b>{persen}% kembali</b>
+          <small>{sudah ? `✅ Lebih ${formatRupiah(-sisa)}` : `Sisa ${formatRupiah(sisa)}`}</small>
+        </div>
+
+        <strong className="sub-judul">💰 Untung terkumpul</strong>
+        <div className="baris-item">
+          <span><small>Total omzet</small></span>
+          <span>{formatRupiah(sp.omzet)}</span>
+        </div>
+        <div className="baris-item">
+          <span><small>− Biaya operasional (bahan, bumbu, kemasan, gas, lain-lain)</small></span>
+          <span>{formatRupiah(sp.operasional)}</span>
+        </div>
+        <div className="baris-item">
+          <span><b>= Untung terkumpul</b></span>
+          <b className={untung < 0 ? 'teks-merah' : ''}>{formatRupiah(untung)}</b>
+        </div>
+
+        {perkiraan && (
+          <div className="kotak-perkiraan">
+            📅 {perkiraan}
+            {untungPerHari > 0 && hariJualan < 7 && (
+              <small> (Masih perkiraan kasar — baru {hariJualan} hari jualan bulan ini.)</small>
+            )}
+          </div>
+        )}
+
+        <strong className="sub-judul">🛠️ Modal peralatan {alat && `(${alat.length})`}</strong>
+        {!alat && <p className="catatan">Memuat…</p>}
+        {/* daftar digulir di dalam kotak, baris "Total modal" tetap terlihat di bawahnya */}
+        {alat && (
+          <div className="daftar-gulir daftar-alat">
+            {alat.map((a) => (
+              <div key={a.id} className="baris-item">
+                <span>
+                  {a.deskripsi}
+                  <br />
+                  <small>{namaHari(a.tanggal)}</small>
+                </span>
+                <span>{formatRupiah(a.nominal)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {alat && (
+          <div className="baris-item baris-total-alat">
+            <span><b>Total modal</b></span>
+            <b>{formatRupiah(alat.reduce((s, a) => s + a.nominal, 0))}</b>
+          </div>
+        )}
+        <p className="catatan">ⓘ Ada yang salah kategori? Ubah di tab Penjualan (pilih tanggalnya → ketuk barangnya).</p>
       </div>
     </div>
   )

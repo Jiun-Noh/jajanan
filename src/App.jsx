@@ -8,7 +8,7 @@ import HariIni from './pages/HariIni'
 import Laporan from './pages/Laporan'
 import Menu from './pages/Menu'
 import ModalPembaruan from './pages/Pembaruan'
-import { PEMBARUAN, pembaruanBelumDilihat, tandaiSudahDilihat } from './lib/pembaruan'
+import { PEMBARUAN, VERSI_TERBARU, pembaruanBelumDilihat, tandaiSudahDilihat } from './lib/pembaruan'
 import { useAdaVersiBaru } from './lib/versiBaru'
 
 const TAB = [
@@ -43,6 +43,7 @@ export default function App() {
 
 function Aplikasi() {
   const [tab, setTab] = useState('kasir')
+  const [drafBelanja, setDrafBelanja] = useState([]) // daftar belanja yang belum disimpan (tetap ada walau pindah tab)
   const [hariDipilih, setHariDipilih] = useState(null) // dari Laporan → buka Penjualan di tanggal itu
   const [menu, setMenu] = useState([])
   const [memuat, setMemuat] = useState(true)
@@ -131,9 +132,12 @@ function Aplikasi() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${adaVersiBaru ? 'ada-pita' : ''}`}>
       <header className="topbar">
         <span>🍟 Kasir Jajanan</span>
+        <button className="btn-atas" onClick={() => setRiwayatBuka(true)} aria-label="Riwayat pembaruan">
+          📢
+        </button>
       </header>
       {adaVersiBaru && (
         <button className="pita-versi" onClick={() => window.location.reload()}>
@@ -148,7 +152,7 @@ function Aplikasi() {
           <>
             {tab === 'kasir' && <Kasir menu={menu} onSimpan={simpanTransaksi} />}
             {tab === 'hariini' && (
-              <HariIni tanggalAwal={hariDipilih} notify={notify} />
+              <HariIni tanggalAwal={hariDipilih} drafBelanja={drafBelanja} setDrafBelanja={setDrafBelanja} notify={notify} />
             )}
             {tab === 'laporan' && (
               <Laporan
@@ -161,7 +165,7 @@ function Aplikasi() {
               />
             )}
             {tab === 'menu' && (
-              <Menu menu={menu} onSimpan={simpanMenu} onTambahStok={tambahStok} onHapus={hapusMenu} onKeluar={keluar} onRiwayat={() => setRiwayatBuka(true)} notify={notify} />
+              <Menu menu={menu} onSimpan={simpanMenu} onTambahStok={tambahStok} onHapus={hapusMenu} onKeluar={keluar} notify={notify} />
             )}
           </>
         )}
@@ -190,7 +194,7 @@ function Aplikasi() {
           }}
         />
       )}
-      {riwayatBuka && <ModalPembaruan daftar={PEMBARUAN} judul="📢 Riwayat pembaruan" onTutup={() => setRiwayatBuka(false)} />}
+      {riwayatBuka && <ModalPembaruan daftar={PEMBARUAN} judul={`📢 Riwayat pembaruan · v${VERSI_TERBARU}`} onTutup={() => setRiwayatBuka(false)} />}
     </div>
   )
 }

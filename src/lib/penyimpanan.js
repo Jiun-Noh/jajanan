@@ -64,23 +64,60 @@ export async function hapusTransaksi(id) {
   periksa(await supabase.rpc('jajanan_batal', { trx_id: id }))
 }
 
-// ---------------- Pengeluaran ----------------
+// ---------------- Pengeluaran / belanja ----------------
+const KOLOM_PGL = 'id, tanggal, deskripsi, nominal, kategori'
+
 export async function ambilPengeluaran(tanggal) {
   return periksa(
     await supabase
       .from('jajanan_pengeluaran')
-      .select('id, tanggal, deskripsi, nominal')
+      .select(KOLOM_PGL)
       .eq('tanggal', tanggal)
       .order('dibuat', { ascending: false }),
   )
 }
 
-export async function tambahPengeluaran(p) {
-  periksa(await supabase.from('jajanan_pengeluaran').insert(p))
+// Simpan satu daftar belanja sekaligus (semua berhasil atau semua gagal)
+export async function tambahBanyakPengeluaran(daftar) {
+  return periksa(await supabase.from('jajanan_pengeluaran').insert(daftar).select(KOLOM_PGL))
+}
+
+export async function ubahPengeluaran(id, data) {
+  return periksa(await supabase.from('jajanan_pengeluaran').update(data).eq('id', id).select(KOLOM_PGL).single())
 }
 
 export async function hapusPengeluaran(id) {
   periksa(await supabase.from('jajanan_pengeluaran').delete().eq('id', id))
+}
+
+// Saran "Sering dibeli": nama, kategori, harga terakhir, berapa kali dibeli
+export async function ambilBarangSering() {
+  return periksa(await supabase.rpc('jajanan_barang_sering'))
+}
+
+// Riwayat pembelian satu barang (untuk melihat perubahan harga)
+export async function ambilRiwayatBarang(nama) {
+  return periksa(
+    await supabase
+      .from('jajanan_pengeluaran')
+      .select('id, tanggal, nominal')
+      .eq('deskripsi', nama)
+      .order('tanggal', { ascending: false })
+      .order('dibuat', { ascending: false })
+      .limit(100),
+  )
+}
+
+// Semua pembelian peralatan (modal) sebelum tanggal `akhir` — rincian "Balik Modal"
+export async function ambilPeralatan(akhir) {
+  return periksa(
+    await supabase
+      .from('jajanan_pengeluaran')
+      .select('id, tanggal, deskripsi, nominal')
+      .eq('kategori', 'Peralatan')
+      .lt('tanggal', akhir)
+      .order('nominal', { ascending: false }),
+  )
 }
 
 // ---------------- Laporan bulanan ----------------

@@ -5,6 +5,23 @@
 
 export const PEMBARUAN = [
   {
+    versi: '1.3.0',
+    tanggal: '2026-11-25',
+    isi: [
+      '⭐ Catat belanja lebih cepat: di tab Penjualan ada "Sering dibeli". Ketuk barangnya — nama, kategori, dan harga terakhir langsung terisi. Ubah harganya saja kalau beda.',
+      '🧾 Masukkan semua barang dari satu struk ke daftar dulu, cocokkan totalnya dengan struk, lalu tekan "Simpan semua".',
+      '🏷️ Setiap belanja sekarang punya kategori: Bahan, Bumbu & Saus, Kemasan, Gas & Minyak, Lain-lain, dan Peralatan/Modal.',
+      '🛠️ Peralatan (stand, panci, wajan…) dihitung sebagai MODAL, bukan biaya harian — jadi "Untung Bersih" sekarang menunjukkan untung jualan yang sebenarnya.',
+      '⚠️ Kalau harga yang diketik jauh beda dari biasanya (mis. kelebihan satu angka 0), aplikasi akan bertanya dulu.',
+      '📈 Di Laporan: progres "Balik Modal", biaya per kategori, persen biaya bahan dari omzet, dan barang yang paling banyak dibeli — ketuk barangnya untuk melihat riwayat harganya.',
+      '✏️ Belanja yang sudah tersimpan bisa diketuk untuk diubah, atau tekan ✕ untuk menghapusnya.',
+      '🛒 Kasir: rincian pesanan sekarang ada di bar bawah — ketuk "lihat pesanan". Tombol − di kartu menu untuk mengurangi langsung.',
+      '📌 Filter kategori di Kasir dan tombol Tambah di Menu tetap terlihat saat menggulir. Tab Menu juga punya kolom 🔍 cari.',
+      '👆 Grafik di Laporan: geser jari di atas grafik untuk memilih hari, atau pakai tombol ‹ ›. Kartu Balik Modal bisa diketuk untuk rincian.',
+      '📢 Riwayat pembaruan sekarang ada di pojok kanan atas.',
+    ],
+  },
+  {
     versi: '1.2.0',
     tanggal: '2026-11-17',
     isi: [

@@ -11,6 +11,7 @@ export default function Kasir({ menu, onSimpan }) {
   const [keranjang, setKeranjang] = useState({}) // { idMenu: qty }
   const [kategori, setKategori] = useState('Semua')
   const [bayarBuka, setBayarBuka] = useState(false)
+  const [pesananBuka, setPesananBuka] = useState(false) // lembar rincian pesanan dari bawah
 
   const daftarKategori = ['Semua', ...new Set(menu.map((m) => m.kategori))]
   const menuTampil = menu.filter((m) => kategori === 'Semua' || m.kategori === kategori)
@@ -27,6 +28,12 @@ export default function Kasir({ menu, onSimpan }) {
   )
   const total = item.reduce((s, i) => s + i.harga * i.qty, 0)
   const jumlahItem = item.reduce((s, i) => s + i.qty, 0)
+
+  // Ganti kategori saat sudah menggulir ke bawah → kembali ke atas daftar menu supaya tidak melihat layar kosong
+  function pilihKategori(k) {
+    setKategori(k)
+    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function ubahQty(id, delta) {
     const m = menu.find((x) => x.id === id)
@@ -54,11 +61,22 @@ export default function Kasir({ menu, onSimpan }) {
     setBayarBuka(false)
   }
 
+  function kosongkanPesanan() {
+    if (!window.confirm('Kosongkan semua pesanan?')) return
+    setKeranjang({})
+    setPesananBuka(false)
+  }
+
+  function keBayar() {
+    setPesananBuka(false)
+    setBayarBuka(true)
+  }
+
   return (
     <div>
-      <div className="chip-baris">
+      <div className="chip-baris filter-kasir">
         {daftarKategori.map((k) => (
-          <button key={k} className={`chip ${kategori === k ? 'aktif' : ''}`} onClick={() => setKategori(k)}>
+          <button key={k} className={`chip ${kategori === k ? 'aktif' : ''}`} onClick={() => pilihKategori(k)}>
             {k}
           </button>
         ))}
@@ -71,63 +89,83 @@ export default function Kasir({ menu, onSimpan }) {
           const qty = keranjang[m.id] || 0
           const dijual = bisaDijual(m)
           return (
-            <button
-              key={m.id}
-              className={`kartu-menu ${qty ? 'dipilih' : ''}`}
-              disabled={!dijual || qty >= maksQty(m)}
-              onClick={() => ubahQty(m.id, 1)}
-            >
-              {qty > 0 && <span className="qty-badge">{qty}</span>}
-              <span className="emoji">{m.emoji}</span>
-              <span className="nama">{m.nama}</span>
-              <span className="harga">{dijual ? formatRupiah(m.harga) : 'HABIS'}</span>
-              {dijual && m.stok != null && <span className={`sisa ${m.stok <= 3 ? 'menipis' : ''}`}>Sisa {m.stok - qty}</span>}
-            </button>
+            <div key={m.id} className="sel-menu">
+              <button
+                className={`kartu-menu ${qty ? 'dipilih' : ''}`}
+                disabled={!dijual || qty >= maksQty(m)}
+                onClick={() => ubahQty(m.id, 1)}
+              >
+                {qty > 0 && <span className="qty-badge">{qty}</span>}
+                <span className="emoji">{m.emoji}</span>
+                <span className="nama">{m.nama}</span>
+                <span className="harga">{dijual ? formatRupiah(m.harga) : 'HABIS'}</span>
+                {dijual && m.stok != null && <span className={`sisa ${m.stok <= 3 ? 'menipis' : ''}`}>Sisa {m.stok - qty}</span>}
+              </button>
+              {/* kurangi langsung dari kartu — terpisah dari kartu supaya tetap bisa ditekan walau kartu penuh/disabled */}
+              {qty > 0 && (
+                <button className="btn-kurang" onClick={() => ubahQty(m.id, -1)} aria-label={`Kurangi ${m.nama}`}>
+                  −
+                </button>
+              )}
+            </div>
           )
         })}
       </div>
 
       {item.length > 0 && (
-        <div className="kartu" style={{ marginTop: 14 }}>
-          <strong>🧾 Pesanan</strong>
-          {item.map((i) => (
-            <div key={i.id} className="baris-item">
-              <span>
-                {i.emoji} {i.nama}
-                <br />
-                <small>{formatRupiah(i.harga)}</small>
-              </span>
-              <span className="stepper">
-                <button onClick={() => ubahQty(i.id, -1)}>−</button>
-                <b>{i.qty}</b>
-                <button onClick={() => ubahQty(i.id, 1)} disabled={i.qty >= i.maks}>+</button>
-              </span>
-            </div>
-          ))}
-          <button className="btn-teks merah" onClick={() => setKeranjang({})}>
-            Kosongkan pesanan
-          </button>
-        </div>
-      )}
-
-      {item.length > 0 && (
         <div className="bar-bayar">
-          <div>
-            <small>{jumlahItem} item</small>
+          <button className="btn-lihat-pesanan" onClick={() => setPesananBuka(true)} aria-label="Lihat rincian pesanan">
+            <small>▲ {jumlahItem} item · lihat pesanan</small>
             <div className="total">{formatRupiah(total)}</div>
-          </div>
+          </button>
           <button className="btn-utama" onClick={() => setBayarBuka(true)}>
             Bayar →
           </button>
         </div>
       )}
 
-      {bayarBuka && <ModalBayar total={total} onBatal={() => setBayarBuka(false)} onSelesai={selesai} />}
+      {pesananBuka && item.length > 0 && (
+        <div className="overlay" onClick={() => setPesananBuka(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-judul">
+              <span>🧾 Pesanan ({jumlahItem} item)</span>
+              <button className="btn-teks" onClick={() => setPesananBuka(false)}>✕</button>
+            </div>
+            <div className="isi-pesanan">
+              {item.map((i) => (
+                <div key={i.id} className="baris-item">
+                  <span>
+                    {i.emoji} {i.nama}
+                    <br />
+                    <small>
+                      {formatRupiah(i.harga)} × {i.qty} = <b>{formatRupiah(i.harga * i.qty)}</b>
+                    </small>
+                  </span>
+                  <span className="stepper">
+                    <button onClick={() => ubahQty(i.id, -1)}>−</button>
+                    <b>{i.qty}</b>
+                    <button onClick={() => ubahQty(i.id, 1)} disabled={i.qty >= i.maks}>+</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button className="btn-teks merah" onClick={kosongkanPesanan}>
+              🗑️ Kosongkan pesanan
+            </button>
+            <div className="kaki-pesanan">
+              <div className="total">{formatRupiah(total)}</div>
+              <button className="btn-utama" onClick={keBayar}>Bayar →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bayarBuka && <ModalBayar total={total} item={item} onBatal={() => setBayarBuka(false)} onSelesai={selesai} />}
     </div>
   )
 }
 
-function ModalBayar({ total, onBatal, onSelesai }) {
+function ModalBayar({ total, item, onBatal, onSelesai }) {
   const [metode, setMetode] = useState('Tunai')
   const [diterima, setDiterima] = useState(total)
   const [menyimpan, setMenyimpan] = useState(false)
@@ -144,6 +182,8 @@ function ModalBayar({ total, onBatal, onSelesai }) {
           <span>💳 Pembayaran</span>
           <button className="btn-teks" onClick={onBatal}>✕</button>
         </div>
+        {/* ringkasan supaya bisa dicek ke pelanggan sebelum menyebut total */}
+        <p className="ringkasan-bayar">{item.map((i) => `${i.nama} ×${i.qty}`).join(', ')}</p>
         <div className="total-besar">{formatRupiah(total)}</div>
 
         <div className="pilih-metode">
